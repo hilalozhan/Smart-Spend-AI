@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>AI Dashboard</title>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        
+        <style>
+            /* General Design */
+            body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 40px; }            
+            h1 { color: #2c3e50; font-size: 24px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+            .card { background: white; border-radius: 15px; padding: 20px; margin: 20px auto; max-width: 800px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+            .accuracy-badge { padding: 5px 10px; border-radius: 20px; color: white; font-size: 0.8em; }
+            .high { background: #27ae60; } .low { background: #e67e22; }
+        </style>
+    </head>
+
+    <body>
+        <nav style="background: #2c3e50; padding: 15px; display: flex; justify-content: center; gap: 20px;">
+            <a href="/" style="color: white; text-decoration: none; font-weight: bold;">🏠 Harcamalar</a>
+            <a href="/analysis" style="color: white; text-decoration: none; font-weight: bold;">🤖 AI Analiz Merkezi</a>
+        </nav>
+
+        <div style="text-align: center;margin-top: 30px;">
+            <h1>AI Spends Analysis</h1>
+        </div>
+
+        {% for res in results %}
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>Kategori: {{ res.category }}</h2>
+                <span class="accuracy-badge {{ 'high' if res.accuracy > 50 else 'low' }}">
+                    Doğruluk: %{{ res.accuracy }}
+                </span>
+            </div>
+            
+            <p>Bir sonraki tahmin: <strong>{{ res.prediction }} TL</strong></p>
+            
+            <div class="chart-container" style="position: relative; height:300px; width:100%">
+                <canvas id="chart-{{ loop.index }}" 
+                        data-labels='{{ res.history_labels | tojson }}'
+                        data-values='{{ res.history_values | tojson }}'
+                        data-trend='{{ res.trend_line | tojson }}'>
+                </canvas>
+            </div>
+        </div>
+        {% endfor %}
+
+        <script>
+            document.querySelectorAll('canvas').forEach(canvas => {
+                // HTML içinden verileri geri okuyoruz
+                const labels = JSON.parse(canvas.getAttribute('data-labels'));
+                const values = JSON.parse(canvas.getAttribute('data-values'));
+                const trend = JSON.parse(canvas.getAttribute('data-trend'));
+
+                new Chart(canvas.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Gerçek Veri',
+                            data: values,
+                            borderColor: '#3498db',
+                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            fill: true,
+                            tension: 0.3
+                        }, {
+                            label: 'AI Trendi',
+                            data: trend,
+                            borderColor: '#e74c3c',
+                            borderDash: [5, 5],
+                            pointRadius: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            });
+        </script>
+
+    </body>
+</html>

@@ -2,8 +2,27 @@ from flask import Flask, render_template, request, redirect
 import sqlite3
 import numpy as np # For mathemetical operations
 from sklearn.linear_model import LinearRegression # AI model 
+from sklearn.metrics import r2_score 
 
 app = Flask(__name__)
+
+'''
+## If want to start with an empty database we use this function 
+def init_db():
+    with sqlite3.connect("database.db") as db:
+        cursor = db.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS spends (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category TEXT NOT NULL,
+                amount REAL NOT NULL
+            )
+        """)
+    db.commit()
+
+init_db()
+'''
+
 
 def pulldata():
     # If use with you do not need use dbconnection.close() method it is goning to close itself
@@ -13,42 +32,56 @@ def pulldata():
         data = cursor.fetchall()
     return data 
 
-def ai_results(spends):
-    category = {}
-    forecasts = {}
+@app.route('/analysis')
+def analysis_page():
+    spends = pulldata()
+    category_data = {}
+    analysis_results = []
 
+    # Gruping data into catories
     for s in spends:
-        id , c , amount = s[0], s[1], s[2]
-        if c not in category:
-            category[c] = []
-        category[c].append((id,amount))
+        cid , cname, amount = s[0] , s[1] ,s[2] 
+        if cname not in category_data:
+             category_data[cname] = {'ids':[], 'amounts':[]}
+        category_data[cname]['ids'].append(cid)
+        category_data[cname]['amounts'] .append(amount)
 
-    for c, spends in category.items():
-        if len(spends) < 2 :
-            forecasts[c] = "Enough data is not exist"
+    for cname , data in category_data.items():
+        if len(data['amounts']) < 3 :
             continue
+        
+        X = np.array(data['ids']).reshape(-1,1)
+        y = np.array(data['amounts'])
 
-        X = np.array([s[0] for s in spends]).reshape(-1,1)
-        y = np.array([s[1] for s in spends])
-
-        model  = LinearRegression()
+        model = LinearRegression()
         model.fit(X,y)
 
-        next_id  = np.array([[X[-1][0] + 1]])
-        forecast = model.predict(next_id)
-        forecasts[c] = f"{round(forecast[0],2)} TL"
+        # Model Accuracy (r2 score)
+        y_pred = model.predict(X)
+        accuracy = r2_score(y,y_pred) 
 
-    return forecasts
+        # Future Predict
+        next_id = np.array([[X[-1][0] + 1]])
+        prediction = model.predict(next_id)[0] 
+
+        analysis_results.append({
+            'category': cname,
+            'prediction': round(prediction, 2),
+            'accuracy': round(accuracy * 100, 2), # % cinsinden
+            'history_labels': data['ids'],
+            'history_values': data['amounts'],
+            'trend_line': [round(i, 2) for i in y_pred]
+        })
+
+    return render_template('analysis.html', results=analysis_results)
 
 
 @app.route('/')
 def main_page():
     spends = pulldata()
-    predict_dictionary = ai_results(spends)
-
     total_spends = sum(s[2] for s in spends) if spends else 0 
+    return render_template('index.html', spends=spends , total= total_spends )   
 
-    return render_template('index.html', spends=spends , predicts=predict_dictionary , total= total_spends )   
 
 
 @app.route('/add', methods=['POST'])  # Added new path for take user data with POST method 
